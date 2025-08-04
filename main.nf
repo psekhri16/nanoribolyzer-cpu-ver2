@@ -86,14 +86,13 @@ process dorado_basecalling {
 
     # Determine filetype
     (ls ${sample_folder}/*.pod5) && export filetype=pod5 || export filetype=fast5
-
-    if [ \$filetype == fast5 ]; then
-        pod5 convert fast5 ${sample_folder}/*.fast5 --output converted_to_pod5/converted.pod5 --force-overwrite
-        dorado basecaller --model ${basecalling_model} fast converted_to_pod5/ > basecalling_output/basecalled.bam
-    else
-        dorado basecaller --model ${basecalling_model} fast ${sample_folder} > basecalling_output/basecalled.bam
-        echo "No conversion needed" > converted_to_pod5/converted.pod5
-    fi
+if [ \$filetype == fast5 ]; then
+    pod5 convert fast5 ${sample_folder}/*.fast5 --output converted_to_pod5/converted.pod5 --force-overwrite
+    dorado basecaller --kit-name SQK-RNA002 --flowcell FLO-MIN106 --model ${basecalling_model} fast converted_to_pod5/ > basecalling_output/basecalled.bam
+else
+    dorado basecaller --kit-name SQK-RNA002 --flowcell FLO-MIN106 --model ${basecalling_model} fast ${sample_folder} > basecalling_output/basecalled.bam
+    echo "No conversion needed" > converted_to_pod5/converted.pod5
+fi
 
     dorado summary basecalling_output/basecalled.bam > basecalling_output/sequencing_summary.txt
     samtools bam2fq basecalling_output/basecalled.bam -@ 3 > basecalling_output/basecalled_not_trimmed.fastq
