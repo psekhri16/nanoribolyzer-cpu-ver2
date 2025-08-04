@@ -64,19 +64,46 @@ println ""
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
-process dorado_basecalling{
+process dorado_basecalling {
     label 'dorado_basecaller'
     publishDir "${params.out_dir}", mode: 'copy'
+    
     input:
     path(sample_folder)
     val basecalling_model
-
+    
     output:
     val done
     path('basecalling_output/basecalled.bam'), emit: basecalled_bam
     path('basecalling_output/sequencing_summary.txt')
     path('basecalling_output/basecalled_not_trimmed.fastq.gz'), emit: fastq_not_trimmed
     path('converted_to_pod5/converted.pod5'), emit: converted_pod5
+
+    script:
+    """
+    mkdir -p basecalling_output
+    mkdir -p converted_to_pod5
+
+    # Determine filetype
+    (ls ${sample_folder}/*.pod5) && export filetype=pod5 || export filetype=fast5
+
+    if [ \$filetype == fast5 ]; then
+        pod5 convert fast5 ${sample_folder}/*.fast5 --output converted_to_pod5/converted.pod5 --force-overwrite
+        dorado basecaller --model ${basecalling_model} fast converted_to_pod5/ > basecalling_output/basecalled.bam
+    else
+        dorado basecaller --model ${basecalling_model} fast ${sample_folder} > basecalling_output/basecalled.bam
+        echo "No conversion needed" > converted_to_pod5/converted.pod5
+    fi
+
+    dorado summary basecalling_output/basecalled.bam > basecalling_output/sequencing_summary.txt
+    samtools bam2fq basecalling_output/basecalled.bam -@ 3 > basecalling_output/basecalled_not_trimmed.fastq
+    gzip basecalling_output/basecalled_not_trimmed.fastq -c -1 > basecalling_output/basecalled_not_trimmed.fastq.gz
+
+    done=1
+    """
+}
+
+
     
     script:
     done = 1
