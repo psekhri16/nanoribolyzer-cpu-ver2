@@ -128,23 +128,21 @@ process dorado_basecalling {
          -1\
           > basecalling_output/basecalled_not_trimmed.fastq.gz
     fi
-    if [ \$filetype == pod5 ]
-    then
-        dorado basecaller ${basecalling_model} ${sample_folder}\
-         > basecalling_output/basecalled.bam
-        dorado summary basecalling_output/basecalled.bam\
-         > basecalling_output/sequencing_summary.txt
-        samtools bam2fq basecalling_output/basecalled.bam\
-         -@ ${params.threads}\
-         > basecalling_output/basecalled_not_trimmed.fastq
-        gzip basecalling_output/basecalled_not_trimmed.fastq\
-         -c\
-         -1\
-          > basecalling_output/basecalled_not_trimmed.fastq.gz
-        echo "No conversion needed" > converted_to_pod5/converted.pod5
-    fi
-    """
-}
+    if [ $filetype == pod5 ]
+then
+    dorado basecaller --kit-name SQK-RNA002 --flowcell FLO-MIN106 ${basecalling_model} ${sample_folder} \
+     > basecalling_output/basecalled.bam
+    dorado summary basecalling_output/basecalled.bam \
+     > basecalling_output/sequencing_summary.txt
+    samtools bam2fq basecalling_output/basecalled.bam \
+     -@ ${params.threads} \
+     > basecalling_output/basecalled_not_trimmed.fastq
+    gzip basecalling_output/basecalled_not_trimmed.fastq \
+     -c \
+     -1 \
+      > basecalling_output/basecalled_not_trimmed.fastq.gz
+    echo "No conversion needed" > converted_to_pod5/converted.pod5
+fi
 
 process trim_barcodes{
     label 'other_tools'
