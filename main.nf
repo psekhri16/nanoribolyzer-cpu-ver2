@@ -3,6 +3,7 @@
 import static com.xlson.groovycsv.CsvParser.parseCsv
 import java.io.File;
 nextflow.enable.dsl=2
+params.basecalling_model = params.basecalling_model ?: 'rna002_70bps_hac@v3'
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                                                                                                                                                         // 
@@ -729,6 +730,12 @@ workflow{
         "${params.sample_folder}", 
         "${params.basecalling_model}"
         )
+ 
+    some_other_process(params.some_input)
+    dorado_basecalling(sample_folder: params.sample_folder, basecalling_model: params.basecalling_model)
+    // other steps
+
+
     trim_barcodes(
         dorado_basecalling.out.fastq_not_trimmed
         )
