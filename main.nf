@@ -96,7 +96,7 @@ process dorado_basecalling {
         # Convert FAST5 to POD5 format
         pod5 convert fast5 "${sample_folder}"/*.fast5 --output converted_to_pod5/converted.pod5 --force-overwrite
 
-        # Use full model path here with dorado basecaller on converted pod5 files
+        # Run dorado basecaller with full model path on converted POD5 files
         dorado basecaller --kit-name SQK-RNA002 --flowcell FLO-MIN106 --model ${basecalling_model} converted_to_pod5/ > basecalling_output/basecalled.bam
     else
         # Directly basecall POD5 files with full model path
@@ -722,7 +722,6 @@ process create_report {
 }
 
 
-
 workflow {
     // Set references based on model organism
     def fasta_reference_file
@@ -751,7 +750,7 @@ workflow {
         sample_folder: params.sample_folder, 
         basecalling_model: params.basecalling_model
     )
-
+ 
     trim_barcodes(
         dorado_basecalling.out.fastq_not_trimmed
         )
