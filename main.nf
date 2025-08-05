@@ -74,7 +74,7 @@ process dorado_basecalling {
     val basecalling_model
 
     output:
-    val done
+    val true, emit: done
     path('basecalling_output/basecalled.bam'), emit: basecalled_bam
     path('basecalling_output/sequencing_summary.txt')
     path('basecalling_output/basecalled_not_trimmed.fastq.gz'), emit: fastq_not_trimmed
@@ -85,33 +85,27 @@ process dorado_basecalling {
     mkdir -p basecalling_output
     mkdir -p converted_to_pod5
 
-    # Determine filetype: check if pod5 files exist in sample folder
+    # Determine filetype
     if ls "${sample_folder}"/*.pod5 1> /dev/null 2>&1; then
         filetype=pod5
     else
         filetype=fast5
     fi
 
-    if [ "\$filetype" = fast5 ]; then
-        # Convert FAST5 to POD5 format
+    if [ "\$filetype" = "fast5" ]; then
         pod5 convert fast5 "${sample_folder}"/*.fast5 --output converted_to_pod5/converted.pod5 --force-overwrite
-
-        # Run dorado basecaller with full model path on converted POD5 files
-        dorado basecaller --kit-name SQK-RNA002 --flowcell FLO-MIN106 --model ${basecalling_model} converted_to_pod5/ > basecalling_output/basecalled.bam
+        dorado basecaller --model ${basecalling_model} converted_to_pod5/ > basecalling_output/basecalled.bam
     else
-        # Directly basecall POD5 files with full model path
-        dorado basecaller --kit-name SQK-RNA002 --flowcell FLO-MIN106 --model ${basecalling_model} "${sample_folder}" > basecalling_output/basecalled.bam
+        dorado basecaller --model ${basecalling_model} "${sample_folder}" > basecalling_output/basecalled.bam
         echo "No conversion needed" > converted_to_pod5/converted.pod5
     fi
 
-    # Generate summary and convert BAM to fastq.gz
     dorado summary basecalling_output/basecalled.bam > basecalling_output/sequencing_summary.txt
     samtools bam2fq basecalling_output/basecalled.bam -@ ${params.threads} > basecalling_output/basecalled_not_trimmed.fastq
-    gzip -c basecalling_output/basecalled_not_trimmed.fastq > basecalling_output/basecalled_not_trimmed.fastq.gz
-
-    done=1
+    gzip basecalling_output/basecalled_not_trimmed.fastq -c -1 > basecalling_output/basecalled_not_trimmed.fastq.gz
     """
 }
+
 
 process trim_barcodes {
     label 'other_tools'
@@ -740,16 +734,12 @@ workflow {
         error "Unsupported model organism: ${params.model_organism}"
     }
 
-    // Print the chosen reference files (optional)
-    println "Using fasta_reference_file: ${fasta_reference_file}"
-    println "Using ribosomal_intermediates_file: ${ribosomal_intermediates_file}"
-    println "Using modification_reference_file: ${modification_reference_file}"
-
-    // Run dorado_basecalling process with explicit named parameters
+    // Run dorado_basecalling process with named parameters
     dorado_basecalling(
         sample_folder: params.sample_folder, 
         basecalling_model: params.basecalling_model
     )
+
  
     trim_barcodes(
         dorado_basecalling.out.fastq_not_trimmed
