@@ -96,10 +96,10 @@ process dorado_basecalling {
         # Convert FAST5 to POD5 format
         pod5 convert fast5 "${sample_folder}"/*.fast5 --output converted_to_pod5/converted.pod5 --force-overwrite
 
-        # Run dorado basecaller using the provided model directory (no 'fast' keyword)
+        # Use full model path here with dorado basecaller on converted pod5 files
         dorado basecaller --kit-name SQK-RNA002 --flowcell FLO-MIN106 --model ${basecalling_model} converted_to_pod5/ > basecalling_output/basecalled.bam
     else
-        # Directly basecall POD5 files
+        # Directly basecall POD5 files with full model path
         dorado basecaller --kit-name SQK-RNA002 --flowcell FLO-MIN106 --model ${basecalling_model} "${sample_folder}" > basecalling_output/basecalled.bam
         echo "No conversion needed" > converted_to_pod5/converted.pod5
     fi
@@ -723,31 +723,34 @@ process create_report {
 
 
 
-workflow{
-    if (params.model_organism == "Human"){
+workflow {
+    // Set references based on model organism
+    def fasta_reference_file
+    def ribosomal_intermediates_file
+    def modification_reference_file
+
+    if (params.model_organism == "Human") {
         fasta_reference_file = "${projectDir}/references/RNA45SN1.fasta"
         ribosomal_intermediates_file = "${projectDir}/references/Literature_Fragments_and_cut_sites_RNA45SN1.csv"
         modification_reference_file = "${projectDir}/references/rRNA_modifications_conv.bed"
-        println fasta_reference_file
-        println ribosomal_intermediates_file
-        println modification_reference_file
-    } else if (params.model_organism == "Yeast"){
+    } else if (params.model_organism == "Yeast") {
         fasta_reference_file = "${projectDir}/references/RDN37-1.fa"
         ribosomal_intermediates_file = "${projectDir}/references/Literature_Fragments_and_cut_sites_RDN37-1.csv"
         modification_reference_file = "${projectDir}/references/rRNA_yeast_modifications_conv.bed"
-        println fasta_reference_file
-        println ribosomal_intermediates_file
-        println modification_reference_file
+    } else {
+        error "Unsupported model organism: ${params.model_organism}"
     }
-    dorado_basecalling(
-        "${params.sample_folder}", 
-        "${params.basecalling_model}"
-        )
- 
-    some_other_process(params.some_input)
-    dorado_basecalling(sample_folder: params.sample_folder, basecalling_model: params.basecalling_model)
-    // other steps
 
+    // Print the chosen reference files (optional)
+    println "Using fasta_reference_file: ${fasta_reference_file}"
+    println "Using ribosomal_intermediates_file: ${ribosomal_intermediates_file}"
+    println "Using modification_reference_file: ${modification_reference_file}"
+
+    // Run dorado_basecalling process with explicit named parameters
+    dorado_basecalling(
+        sample_folder: params.sample_folder, 
+        basecalling_model: params.basecalling_model
+    )
 
     trim_barcodes(
         dorado_basecalling.out.fastq_not_trimmed
