@@ -3,7 +3,7 @@
 import static com.xlson.groovycsv.CsvParser.parseCsv
 import java.io.File;
 nextflow.enable.dsl=2
-params.basecalling_model = params.basecalling_model ?: 'rna002_70bps_hac@v3'
+params.basecalling_model = '/home/hanliao/dorado_models/rna002_70bps_hac@v3'
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                                                                                                                                                         // 
@@ -70,7 +70,7 @@ process dorado_basecalling {
     publishDir "${params.out_dir}", mode: 'copy'
 
     input:
-    path(sample_folder)
+    path sample_folder
     val basecalling_model
 
     output:
@@ -85,37 +85,50 @@ process dorado_basecalling {
     mkdir -p basecalling_output
     mkdir -p converted_to_pod5
 
-    # Determine filetype
-    (ls "${sample_folder}"/*.pod5) && export filetype=pod5 || export filetype=fast5
-
-    if [ "\$filetype" == fast5 ]; then
-        pod5 convert fast5 "${sample_folder}"/*.fast5 --output converted_to_pod5/converted.pod5 --force-overwrite
-        dorado basecaller --kit-name SQK-RNA002 --flowcell FLO-MIN106 --model ${basecalling_model} fast converted_to_pod5/ > basecalling_output/basecalled.bam
+    # Determine filetype: check if pod5 files exist in sample folder
+    if ls "${sample_folder}"/*.pod5 1> /dev/null 2>&1; then
+        filetype=pod5
     else
-        dorado basecaller --kit-name SQK-RNA002 --flowcell FLO-MIN106 --model ${basecalling_model} fast "${sample_folder}" > basecalling_output/basecalled.bam
+        filetype=fast5
+    fi
+
+    if [ "\$filetype" = fast5 ]; then
+        # Convert FAST5 to POD5 format
+        pod5 convert fast5 "${sample_folder}"/*.fast5 --output converted_to_pod5/converted.pod5 --force-overwrite
+
+        # Run dorado basecaller using the provided model directory (no 'fast' keyword)
+        dorado basecaller --kit-name SQK-RNA002 --flowcell FLO-MIN106 --model ${basecalling_model} converted_to_pod5/ > basecalling_output/basecalled.bam
+    else
+        # Directly basecall POD5 files
+        dorado basecaller --kit-name SQK-RNA002 --flowcell FLO-MIN106 --model ${basecalling_model} "${sample_folder}" > basecalling_output/basecalled.bam
         echo "No conversion needed" > converted_to_pod5/converted.pod5
     fi
 
+    # Generate summary and convert BAM to fastq.gz
     dorado summary basecalling_output/basecalled.bam > basecalling_output/sequencing_summary.txt
     samtools bam2fq basecalling_output/basecalled.bam -@ ${params.threads} > basecalling_output/basecalled_not_trimmed.fastq
-    gzip basecalling_output/basecalled_not_trimmed.fastq -c -1 > basecalling_output/basecalled_not_trimmed.fastq.gz
+    gzip -c basecalling_output/basecalled_not_trimmed.fastq > basecalling_output/basecalled_not_trimmed.fastq.gz
 
     done=1
     """
 }
 
-process trim_barcodes{
+process trim_barcodes {
     label 'other_tools'
     publishDir "${params.out_dir}/basecalling_output/", mode: 'copy'
+
     input:
-        path(fastq_not_trimmed) 
+    path fastq_not_trimmed
+
     output:
-        path("basecalled.fastq.gz"), emit: basecalled_fastq  
+    path("basecalled.fastq.gz"), emit: basecalled_fastq  
+
+    script:
     """
-    porechop\
-     -i basecalled_not_trimmed.fastq.gz\
-     -o basecalled.fastq.gz\
-     --threads ${params.threads}
+    porechop \
+        -i ${fastq_not_trimmed} \
+        -o basecalled.fastq.gz \
+        --threads ${params.threads}
     """
 }
 
