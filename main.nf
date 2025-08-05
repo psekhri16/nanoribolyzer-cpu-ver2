@@ -20,6 +20,8 @@ println "Seqfolder"
 println params.sample_folder
 println ""
 
+println "✅ Running updated workflow!"
+
 println "Color"
 println params.color
 println ""
